@@ -12,6 +12,9 @@ use frontend\models\PasswordResetRequestForm;
 use frontend\models\ResetPasswordForm;
 use frontend\models\SignupForm;
 use frontend\models\ContactForm;
+use common\models\User;
+use common\models\Friends;
+use yii\data\ActiveDataProvider;
 
 /**
  * Site controller
@@ -38,12 +41,18 @@ class SiteController extends Controller
                         'allow' => true,
                         'roles' => ['@'],
                     ],
+                    [
+                        'actions' => ['profile'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                    ],
                 ],
             ],
             'verbs' => [
                 'class' => VerbFilter::className(),
                 'actions' => [
                     'logout' => ['post'],
+                    'delete' => ['post'],
                 ],
             ],
         ];
@@ -72,7 +81,71 @@ class SiteController extends Controller
      */
     public function actionIndex()
     {
-        return $this->render('index');
+        $dataProvider = new ActiveDataProvider([
+            'query' => User::find(),
+            'pagination' => [
+                'pageSize' => 20,
+            ],
+        ]);
+        return $this->render('index', ['dataProvider' => $dataProvider]);
+    }
+
+    public function actionView($id)
+    {
+      $model = User::findOne($id);
+      return $this->render('view', ['model' => $model]);
+    }
+
+    public function actionProfile()
+    {
+      $dataProvider = new ActiveDataProvider([
+          'query' => Friends::getAllMyPotentialFriends(),
+          'pagination' => [
+              'pageSize' => 20,
+          ],
+      ]);
+      return $this->render('profile', ['dataProvider' => $dataProvider]);
+    }
+
+    public function actionAddFriend($id)
+    {
+        if ($id != Yii::$app->getUser()->id && !Friends::isMy($id)) {
+            $model = new Friends();
+            $model->friend_id = $id;
+            $model->save();
+        }
+        $this->redirect(Yii::$app->request->referrer);
+    }
+
+    public function actionRemoveFriend($id)
+    {
+        if ($id != Yii::$app->getUser()->id) {
+            $model = Friends::find()
+                        ->where(['user_id' => Yii::$app->getUser()->id])
+                        ->andWhere(['friend_id' => $id])
+                        ->one();
+            if (!is_null($model)) {
+              $model->delete();
+            }
+        }
+        $this->redirect(Yii::$app->request->referrer);
+    }
+
+    /**
+     * Deletes an existing User model.
+     * If deletion is successful, the browser will be redirected to the 'index' page.
+     * @param integer $id
+     * @return mixed
+     */
+    public function actionDelete($id)
+    {
+        if ($id != Yii::$app->getUser()->id) {
+          $model = User::findOne($id);
+          if (!is_null($model)) {
+            $model->delete();
+          }
+        }
+        return $this->redirect(Yii::$app->request->referrer);
     }
 
     /**
